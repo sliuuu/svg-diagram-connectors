@@ -1,0 +1,109 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>svg-diagram-connectors v3 — strengthened centering rule</title>
+<style>
+  body { background:#0b1020; color:#fff; font-family:system-ui; margin:24px; }
+  h2,h3 { margin:8px 0; }
+  .row { display:flex; gap:24px; flex-wrap:wrap; }
+  .diagram-canvas { position:relative; width:520px; height:480px; background:#11183a; border:1px solid #2a3470; }
+  .diagram-svg { position:absolute; inset:0; pointer-events:none; }
+  .group { position:absolute; border:2px solid #6aa1ff; border-radius:10px;
+           background:rgba(106,161,255,0.08); display:flex; align-items:center; justify-content:center;
+           font-weight:600; }
+  .src   { border-color:#ffd166; background:rgba(255,209,102,0.10); }
+  path   { fill:none; stroke:#ff7ab6; stroke-width:2.5; }
+  .axis  { stroke:#ffd166; stroke-dasharray:4 4; stroke-width:1; }
+  .marker{ fill:#ffd166; }
+  pre    { background:#11183a; padding:12px; border:1px solid #2a3470; border-radius:6px; min-width:480px; }
+  .ok { color:#7af0a8; } .fail { color:#ff7676; }
+</style></head>
+<body>
+  <h2>svg-diagram-connectors v3 — strengthened rule (Step 1 + Step 2)</h2>
+  <p>Same input as v2 BEFORE: D1/D2/D3 with unequal gaps. Three panels show progressive correction.</p>
+
+  <div class="row">
+    <div>
+      <h3>RAW</h3>
+      <div class="diagram-canvas" id="cv0"></div>
+      <pre id="report0"></pre>
+    </div>
+    <div>
+      <h3>STEP 1 only (shift)</h3>
+      <div class="diagram-canvas" id="cv1"></div>
+      <pre id="report1"></pre>
+    </div>
+    <div>
+      <h3>STEP 1 + 2 (shift + redistribute)</h3>
+      <div class="diagram-canvas" id="cv2"></div>
+      <pre id="report2"></pre>
+    </div>
+  </div>
+
+<script>
+  const SRC_BOX = { l:60, t:140, w:140, h:120 };
+  const SRC_MID = { x: SRC_BOX.l+SRC_BOX.w, y: SRC_BOX.t+SRC_BOX.h/2 };  // (200,200)
+
+  // Same off-center input from v2
+  const RAW = [
+    { l:370, t:40,  w:120, h:80 },
+    { l:370, t:180, w:120, h:80 },
+    { l:370, t:340, w:120, h:80 },
+  ];
+
+  function lmid(d) { return { x: d.l, y: d.t + d.h/2 }; }
+  function bezier(s, e) {
+    const cx = s.x + (e.x - s.x) / 2;
+    return `M ${s.x} ${s.y} C ${cx} ${s.y} ${cx} ${e.y} ${e.x} ${e.y}`;
+  }
+  function step1(dests, srcY) {
+    const span = (dests[dests.length-1].t + dests[dests.length-1].h) - dests[0].t;
+    const newFirst = srcY - span/2;
+    const delta = newFirst - dests[0].t;
+    return dests.map(d => ({ ...d, t: d.t + delta }));
+  }
+  function step2(dests, srcY) {
+    const N = dests.length;
+    const span = (dests[N-1].t + dests[N-1].h) - dests[0].t;
+    const firstTop = dests[0].t;
+    const firstMid = firstTop + dests[0].h/2;
+    const lastMid  = firstTop + span - dests[N-1].h/2;
+    const midStep  = (lastMid - firstMid) / (N-1);
+    return dests.map((d, i) => ({ ...d, t: firstMid + i*midStep - d.h/2 }));
+  }
+  function asserts(dests, srcY) {
+    const m = dests.map(d => lmid(d).y);
+    const center = (Math.min(...m) + Math.max(...m)) / 2;
+    const dA = Math.abs(center - srcY);
+    const gaps = m.slice(1).map((y,i) => y - m[i]);
+    const dB = Math.max(...gaps) - Math.min(...gaps);
+    return { mids: m, gaps, center, dA, dB, passA: dA<=5, passB: dB<=5 };
+  }
+
+  function render(canvasId, reportId, dests, label) {
+    const cv = document.getElementById(canvasId);
+    const svg = `<svg class="diagram-svg" viewBox="0 0 520 480" preserveAspectRatio="none">
+        <line class="axis" x1="0" y1="${SRC_MID.y}" x2="520" y2="${SRC_MID.y}"/>
+        ${dests.map(d => `<path d="${bezier(SRC_MID, lmid(d))}"/>`).join('')}
+        <circle class="marker" cx="${SRC_MID.x}" cy="${SRC_MID.y}" r="3"/>
+        ${dests.map(d => { const e=lmid(d); return `<circle class="marker" cx="${e.x}" cy="${e.y}" r="3"/>`; }).join('')}
+      </svg>
+      <div class="group src" style="left:${SRC_BOX.l}px; top:${SRC_BOX.t}px; width:${SRC_BOX.w}px; height:${SRC_BOX.h}px;">SRC</div>
+      ${dests.map((d,i) => `<div class="group" style="left:${d.l}px; top:${d.t}px; width:${d.w}px; height:${d.h}px;">D${i+1}</div>`).join('')}`;
+    cv.innerHTML = svg;
+    const a = asserts(dests, SRC_MID.y);
+    const d2OnAxis = Math.abs(a.mids[1] - SRC_MID.y) < 0.5;
+    document.getElementById(reportId).innerHTML =
+      `mids   = [${a.mids.join(', ')}]\n` +
+      `gaps   = [${a.gaps.join(', ')}]\n` +
+      `(a) center=${a.center} |Δ|=${a.dA}  <span class="${a.passA?'ok':'fail'}">${a.passA?'PASS':'FAIL'}</span>\n` +
+      `(b) gap-spread=${a.dB}        <span class="${a.passB?'ok':'fail'}">${a.passB?'PASS':'FAIL'}</span>\n` +
+      `D2 on axis: <span class="${d2OnAxis?'ok':'fail'}">${d2OnAxis?'YES':'NO ('+(a.mids[1]-SRC_MID.y)+'px off)'}</span>`;
+  }
+
+  const after1 = step1(RAW, SRC_MID.y);
+  const after2 = step2(after1, SRC_MID.y);
+
+  render('cv0', 'report0', RAW,    'RAW');
+  render('cv1', 'report1', after1, 'STEP 1');
+  render('cv2', 'report2', after2, 'STEP 1+2');
+</script>
+</body></html>

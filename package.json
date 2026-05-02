@@ -1,0 +1,12 @@
+{
+  "name": "svg-diagram-connectors",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deterministic SVG path-endpoint formulas for HTML+SVG architecture diagrams",
+  "scripts": {
+    "test": "node smoke-test/run.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
