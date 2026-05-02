@@ -28,8 +28,8 @@ rendered image.
 The pattern this skill assumes:
 
 ```
-┌── div.diagram-canvas (fixed pixel size) ──────────────┐
-│  ┌── svg.diagram-svg (absolute, viewBox matches) ──┐  │
+┌── div.diagram-canvas (fixed pixel size) ───────────────┐
+│  ┌── svg.diagram-svg (absolute, viewBox matches) ───┐  │
 │  │                                                  │  │
 │  │     <path d="..." />                             │  │
 │  │                                                  │  │
